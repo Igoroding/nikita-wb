@@ -470,11 +470,22 @@ ${lines.join('\n')}
 Будь конкретным. Указывай артикулы и цифры. Пиши по-русски кратко.`;
 
   try {
-    const res = await fetch('https://wbtrenz.app.n8n.cloud/webhook/wb-ai-v7', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ prompt })
-    });
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 90000);
+    let res;
+    try {
+      res = await fetch('https://wbtrenz.app.n8n.cloud/webhook/wb-ai-v7', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ prompt }),
+        signal: controller.signal
+      });
+    } catch(e) {
+      clearTimeout(timer);
+      if (e.name === 'AbortError') throw new Error('Таймаут 90 сек. Попробуйте ещё раз.');
+      throw e;
+    }
+    clearTimeout(timer);
     const data = await res.json();
     const text = data.result || JSON.stringify(data);
     panel.innerHTML = text;
