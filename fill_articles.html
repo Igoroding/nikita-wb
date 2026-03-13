@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<title>Загрузка названий товаров</title>
+<style>
+  body { font-family: system-ui; background: #0d0d0d; color: #ddd; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; gap: 20px; }
+  button { background: #7c5cfc; color: white; border: none; padding: 14px 32px; border-radius: 10px; font-size: 16px; cursor: pointer; }
+  button:disabled { opacity: 0.5; cursor: default; }
+  #log { background: #1a1a1a; border-radius: 10px; padding: 20px; width: 500px; font-size: 13px; line-height: 1.8; max-height: 400px; overflow-y: auto; }
+  .ok { color: #05d69e; }
+  .err { color: #ff4d4d; }
+</style>
+</head>
+<body>
+<h2>Загрузка названий товаров в Supabase</h2>
+<button id="btn" onclick="run()">▶ Запустить</button>
+<div id="log">Нажми кнопку для загрузки названий из WB...</div>
+
+<script>
+const WB_TOKEN = 'eyJhbGciOiJFUzI1NiIsImtpZCI6IjIwMjYwMzAydjEiLCJ0eXAiOiJKV1QifQ.eyJhY2MiOjEsImVudCI6MSwiZXhwIjoxNzg4OTkwODE4LCJpZCI6IjAxOWNkYzUwLWYyZGItNzRlZC1iYWViLTMxZmJhMDVkNTFiOCIsImlpZCI6ODgzOTAyMzMsIm9pZCI6NDI4NDI1OSwicyI6MTA3Mzc0MzA5NCwic2lkIjoiZWI5YjVkZDYtMzRlOS00NzY5LWI4NTEtZDZlOTYwYTNkNGExIiwidCI6ZmFsc2UsInVpZCI6ODgzOTAyMzN9.b-c3cL54X8UIr-rTlx6eMMRFEQyLEUd11hOFtmP_yafPInCI4fBkuIboGeH4Hlm72_AyP7bl7t-50iYp7pH_Kg';
+const SB_URL = 'https://icszrjcvvabqgtvjghpv.supabase.co';
+const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imljc3pyamN2dmFicWd0dmpnaHB2Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3MzQwMTE2NiwiZXhwIjoyMDg4OTc3MTY2fQ.JDEVbKvxgmVpw5Jax9mv_0bTezQ0kfZuj65SgShXoqM';
+const SHOP = 'nikita';
+
+function log(msg, cls='') {
+  const d = document.getElementById('log');
+  d.innerHTML += `<div class="${cls}">${msg}</div>`;
+  d.scrollTop = d.scrollHeight;
+}
+
+async function run() {
+  const btn = document.getElementById('btn');
+  btn.disabled = true;
+  document.getElementById('log').innerHTML = '';
+  log('Запрашиваю карточки из WB Content API...');
+
+  try {
+    let allCards = [];
+    let cursor = { limit: 100 };
+
+    for (let page = 0; page < 50; page++) {
+      const body = { settings: { cursor, filter: { withPhoto: -1 } } };
+      const resp = await fetch('https://content-api.wildberries.ru/content/v2/get/cards/list', {
+        method: 'POST',
+        headers: { 'Authorization': 'Bearer ' + WB_TOKEN, 'Content-Type': 'application/json' },
+        body: JSON.stringify(body)
+      });
+      const data = await resp.json();
+      const cards = data.cards || [];
+      allCards = allCards.concat(cards);
+      log(`Страница ${page+1}: получено ${cards.length} карточек (всего ${allCards.length})`);
+
+      if (data.cursor && data.cursor.updatedAt && cards.length === 100) {
+        cursor = { limit: 100, updatedAt: data.cursor.updatedAt, nmID: data.cursor.nmID };
+      } else {
+        break;
+      }
+    }
+
+    log(`Итого карточек: ${allCards.length}. Сохраняю в Supabase...`);
+
+    const rows = allCards
+      .map(c => ({ shop: SHOP, article: String(c.vendorCode||'').trim(), name: String(c.title||c.subjectName||'').trim() }))
+      .filter(r => r.article);
+
+    // Upsert батчами по 50
+    const BATCH = 50;
+    for (let i = 0; i < rows.length; i += BATCH) {
+      const batch = rows.slice(i, i + BATCH);
+      const r = await fetch(`${SB_URL}/rest/v1/wb_articles?on_conflict=shop,article`, {
+        method: 'POST',
+        headers: {
+          'apikey': SB_KEY,
+          'Authorization': 'Bearer ' + SB_KEY,
+          'Content-Type': 'application/json',
+          'Prefer': 'resolution=merge-duplicates'
+        },
+        body: JSON.stringify(batch)
+      });
+      if (!r.ok) {
+        const err = await r.text();
+        log('Ошибка сохранения: ' + err, 'err');
+      }
+    }
+
+    log('', '');
+    log(`✅ Готово! Сохранено ${rows.length} артикулов:`, 'ok');
+    for (const r of rows) log(`  ${r.article} → ${r.name}`, 'ok');
+    log('', '');
+    log('Обнови страницу stocks.html — названия появятся.');
+
+  } catch(e) {
+    log('Ошибка: ' + e.message, 'err');
+  }
+
+  btn.disabled = false;
+}
+</script>
+</body>
+</html>
