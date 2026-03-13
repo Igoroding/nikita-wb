@@ -252,7 +252,7 @@ function fmtMonthLabel(m) {
 }
 
 async function loadPlan(month) {
-  const rows = await sbGet(`/rest/v1/wb_plan?month=eq.${month}&shop=eq.${SHOP}&limit=1`);
+  const rows = await sbGet(`/rest/v1/wb_plan?month=eq.${month}&limit=1`);
   if (rows && rows.length > 0) {
     plan = rows[0];
   } else {
@@ -282,7 +282,7 @@ async function savePlan() {
     drr_plan:    parseFloat(document.getElementById('plan-drr').value)    || 10,
     updated_at:  new Date().toISOString()
   };
-  await sbPost('/rest/v1/wb_plan?on_conflict=month,shop', body);
+  await sbPost('/rest/v1/wb_plan?on_conflict=month', body);
   plan = body;
   const s = document.getElementById('plan-saved');
   s.style.opacity = 1;
@@ -481,7 +481,7 @@ function toggleJournal() {
 
 async function loadJournal() {
   try {
-    const rows = await sbGet(`/rest/v1/wb_journal?shop=eq.${SHOP}&order=date.desc,created_at.desc&limit=60`);
+    const rows = await sbGet(`/rest/v1/wb_journal?order=date.desc,created_at.desc&limit=60`);
     journalEntries = rows || [];
     renderJournal();
   } catch(e) { journalEntries = []; }
@@ -510,7 +510,7 @@ async function saveJournalEntry() {
   if (!note) return;
   const date = dateEl.value || new Date().toLocaleDateString('sv-SE');
   try {
-    await sbPost('/rest/v1/wb_journal', { date, note, shop: SHOP });
+    await sbPost('/rest/v1/wb_journal', { date, note });
     noteEl.value = '';
     savedEl.style.opacity = '1';
     setTimeout(() => savedEl.style.opacity = '0', 2000);
@@ -641,7 +641,7 @@ async function runAI() {
 
   const planInfo = `План на месяц: заказы ${(plan.orders_plan/1000000).toFixed(1)}М₽, продажи ${(plan.sales_plan/1000000).toFixed(1)}М₽, ДРР ${plan.drr_plan}%`;
 
-  const recentJournal = journalEntries.filter(e => e.date >= from14 && e.date <= today && e.shop === SHOP);
+  const recentJournal = (Array.isArray(journalEntries) ? journalEntries : []).filter(e => e.date >= from14 && e.date <= today && e.shop === SHOP);
   const journalText = recentJournal.length > 0
     ? '\n\nДействия и события за период:\n' + recentJournal.slice().reverse().map(e => `${e.date}: ${e.note}`).join('\n')
     : '';
