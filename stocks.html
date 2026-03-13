@@ -236,6 +236,10 @@ async function loadStocks() {
     dateSet.add(row.date);
     if (!pivot[row.article]) pivot[row.article] = {};
     pivot[row.article][row.date] = row.quantity;
+    // Берём название прямо из wb_stocks (поле name)
+    if (row.name && row.name.trim() && !articleNames[row.article]) {
+      articleNames[row.article] = row.name.trim();
+    }
   }
 
   const dates = Array.from(dateSet).sort();
