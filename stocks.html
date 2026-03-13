@@ -1,0 +1,470 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Остатки на складах WB</title>
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Geologica:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: #080c10; color: #dde4ee; font-family: 'Geologica', system-ui, sans-serif; min-height: 100vh; }
+
+  /* Controls */
+  .controls { padding: 14px 24px; display: flex; gap: 12px; align-items: center; flex-wrap: wrap; border-bottom: 1px solid #1e1e1e; }
+  .view-tab { background: #1e1e1e; border: 1px solid #2a2a2a; border-radius: 8px; padding: 6px 14px; cursor: pointer; font-size: 12px; color: #aaa; transition: all .2s; }
+  .view-tab.active { background: #7c5cfc22; border-color: #7c5cfc; color: #7c5cfc; }
+  .info { margin-left: auto; font-size: 12px; color: #555; }
+
+  /* Summary bar */
+  .summary-bar { display: flex; gap: 16px; padding: 14px 24px; border-bottom: 1px solid #1e1e1e; flex-wrap: wrap; align-items: center; }
+  .summary-card { background: #1a1a1a; border: 1px solid #2a2a2a; border-radius: 10px; padding: 10px 18px; display: flex; align-items: center; gap: 12px; min-width: 180px; }
+  .summary-card.danger { border-color: #ff4d4d44; background: #1f1010; }
+  .summary-card.warning { border-color: #ffc44244; background: #1f1b10; }
+  .summary-card.good { border-color: #05d69e44; background: #101f1a; }
+  .sc-label { font-size: 11px; color: #666; text-transform: uppercase; letter-spacing: 1px; }
+  .sc-value { font-size: 22px; font-weight: 800; }
+  .sc-value.red { color: #ff4d4d; }
+  .sc-value.yellow { color: #ffc442; }
+  .sc-value.green { color: #05d69e; }
+  .progress-wrap { flex: 1; min-width: 200px; }
+  .progress-bar { height: 6px; background: #2a2a2a; border-radius: 3px; overflow: hidden; margin-top: 4px; }
+  .progress-fill { height: 100%; border-radius: 3px; transition: width .5s; }
+
+  /* Risk panel */
+  .risk-panel { margin: 0 24px 16px; background: #1a0f0f; border: 1px solid #ff4d4d33; border-radius: 12px; overflow: hidden; }
+  .risk-header { padding: 12px 18px; background: #200f0f; display: flex; align-items: center; gap: 10px; cursor: pointer; user-select: none; }
+  .risk-header h3 { font-size: 13px; font-weight: 700; color: #ff6b6b; }
+  .risk-header .risk-count { background: #ff4d4d; color: #fff; font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 10px; }
+  .risk-header .toggle { margin-left: auto; color: #666; font-size: 12px; }
+  .risk-body { padding: 0 18px 14px; }
+  .risk-items { display: flex; flex-wrap: wrap; gap: 8px; padding-top: 12px; }
+  .risk-item { background: #2a1010; border: 1px solid #ff4d4d44; border-radius: 8px; padding: 8px 14px; }
+  .risk-item.critical { border-color: #ff4d4d; background: #300f0f; }
+  .risk-item .ri-name { font-size: 12px; color: #ddd; font-weight: 600; }
+  .risk-item .ri-days { font-size: 11px; margin-top: 2px; }
+  .ri-days.critical { color: #ff4d4d; }
+  .ri-days.warning { color: #ffc442; }
+  .ri-stock { font-size: 11px; color: #666; margin-top: 1px; }
+
+  /* Legend */
+  .legend { display: flex; gap: 16px; padding: 10px 24px; font-size: 11px; flex-wrap: wrap; border-bottom: 1px solid #1a1a1a; }
+  .legend-item { display: flex; align-items: center; gap: 6px; color: #666; }
+  .dot { width: 8px; height: 8px; border-radius: 50%; }
+
+  /* Table */
+  .table-wrap { padding: 0 0 40px; overflow-x: auto; }
+  table { border-collapse: collapse; font-size: 12px; width: 100%; }
+  thead { position: sticky; top: 0; z-index: 10; }
+  th { background: #141414; color: #666; font-weight: 600; padding: 10px 14px; text-align: center; border-bottom: 2px solid #2a2a2a; white-space: nowrap; font-size: 11px; }
+  th.art-col { text-align: left; min-width: 220px; position: sticky; left: 0; z-index: 11; background: #141414; padding-left: 24px; }
+  th.today-col { color: #cb11ab; }
+  td { padding: 8px 14px; border-bottom: 1px solid #191919; text-align: center; white-space: nowrap; }
+  td.art-col { text-align: left; position: sticky; left: 0; background: #0d0d0d; font-size: 12px; color: #bbb; z-index: 5; padding-left: 24px; min-width: 220px; }
+  td.art-col.risk-row { color: #ff8080; }
+  td.art-col.risk-row::after { content: ' ⚠'; font-size: 10px; color: #ff4d4d; }
+  tr:hover td { background: #151515; }
+  tr:hover td.art-col { background: #181818; }
+  tr.risk-row-tr td { background: #180e0e; }
+  tr.risk-row-tr:hover td { background: #1f1010; }
+
+  .qty { font-weight: 600; font-size: 13px; }
+  .qty-high  { color: #05d69e; }
+  .qty-mid   { color: #ffc442; }
+  .qty-low   { color: #ff6d3b; }
+  .qty-zero  { color: #ff3333; font-weight: 700; font-size: 13px; }
+  .qty-new   { color: #3b9eff; font-weight: 700; }
+  .qty-today { background: #cb11ab18; border-radius: 4px; padding: 2px 6px; }
+
+  .loading { text-align: center; padding: 80px; color: #555; font-size: 15px; }
+  .error-msg { text-align: center; padding: 40px; color: #ff6b6b; }
+
+  /* AI Analysis block */
+  .ai-section { margin: 0 24px 20px; }
+  .ai-btn {
+    background: linear-gradient(135deg, #7c5cfc, #5c3cdc);
+    border: none; border-radius: 10px; padding: 10px 22px;
+    color: #fff; font-size: 13px; font-weight: 700; cursor: pointer;
+    font-family: 'Geologica', sans-serif; transition: opacity .2s;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .ai-btn:hover { opacity: 0.85; }
+  .ai-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+  .ai-panel {
+    margin-top: 14px; background: #0e0e1a; border: 1px solid #7c5cfc44;
+    border-radius: 12px; padding: 20px 24px;
+    font-size: 14px; line-height: 1.75; color: #dde4ee;
+    display: none;
+  }
+  .ai-panel.visible { display: block; }
+</style>
+</head>
+<body>
+<script src="header.js" defer></script>
+
+<div class="controls">
+  <div class="view-tab active" id="vt-table" onclick="setView('table',this)">📊 Таблица</div>
+  <div class="view-tab" id="vt-risk" onclick="setView('risk',this)">⚠️ Только риски</div>
+  <div class="info" id="info">Загрузка...</div>
+  <button class="ai-btn" id="ai-btn" onclick="runStocksAI()" style="margin-left:auto">✨ AI-анализ склада</button>
+</div>
+
+<!-- Summary bar -->
+<div class="summary-bar" id="summary-bar" style="display:none">
+  <div class="summary-card" id="sc-instock">
+    <div>
+      <div class="sc-label">В наличии</div>
+      <div class="sc-value green" id="sc-instock-val">—</div>
+    </div>
+    <div class="progress-wrap">
+      <div style="font-size:11px;color:#666" id="sc-instock-sub"></div>
+      <div class="progress-bar"><div class="progress-fill" id="progress-fill" style="background:#05d69e"></div></div>
+    </div>
+  </div>
+  <div class="summary-card danger" id="sc-zero">
+    <div>
+      <div class="sc-label">Нулевые остатки</div>
+      <div class="sc-value red" id="sc-zero-val">—</div>
+    </div>
+    <div style="font-size:11px;color:#ff6b6b;margin-left:8px" id="sc-zero-sub"></div>
+  </div>
+  <div class="summary-card warning" id="sc-risk">
+    <div>
+      <div class="sc-label">⚠ Зона риска (&lt;10 дней)</div>
+      <div class="sc-value yellow" id="sc-risk-val">—</div>
+    </div>
+    <div style="font-size:11px;color:#ffc442;margin-left:8px" id="sc-risk-sub"></div>
+  </div>
+</div>
+
+<!-- Risk panel -->
+<div class="risk-panel" id="risk-panel" style="display:none">
+  <div class="risk-header" onclick="toggleRisk()">
+    <span>🔴</span>
+    <h3>Зона риска — нужна поставка</h3>
+    <span class="risk-count" id="risk-count">0</span>
+    <span class="toggle" id="risk-toggle">▼ скрыть</span>
+  </div>
+  <div class="risk-body" id="risk-body">
+    <div class="risk-items" id="risk-items"></div>
+  </div>
+</div>
+
+<div class="legend">
+  <div class="legend-item"><div class="dot" style="background:#05d69e"></div> &gt;50 шт</div>
+  <div class="legend-item"><div class="dot" style="background:#ffc442"></div> 10–50 шт</div>
+  <div class="legend-item"><div class="dot" style="background:#ff6d3b"></div> 1–9 шт</div>
+  <div class="legend-item"><div class="dot" style="background:#ff3333"></div> 0 — нет на складе</div>
+  <div class="legend-item"><div class="dot" style="background:#3b9eff"></div> Новое поступление</div>
+  <div class="legend-item"><span style="color:#ff8080">⚠ артикул</span> — риск обнуления &lt;10 дней</div>
+</div>
+
+<div id="loading" class="loading">Загружаем данные...</div>
+<div id="error-msg" class="error-msg" style="display:none"></div>
+
+<!-- AI Panel -->
+<div class="ai-section" id="ai-section" style="display:none">
+  <div class="ai-panel visible" id="ai-panel"></div>
+</div>
+
+<div class="table-wrap" id="table-wrap" style="display:none">
+  <table id="main-table">
+    <thead id="thead"></thead>
+    <tbody id="tbody"></tbody>
+  </table>
+</div>
+
+<script>
+// ⚙️ Заменить после создания Supabase проекта:
+const SUPABASE_URL = 'YOUR_SUPABASE_URL';
+const SUPABASE_KEY = 'YOUR_SUPABASE_ANON_KEY';
+
+const SHOP = 'nikita';
+const RISK_DAYS = 10;
+
+let currentView = 'table';
+let lastPivot = {};
+let lastDates = [];
+let lastRiskItems = [];
+
+async function loadStocks() {
+  document.getElementById('loading').style.display = 'block';
+  document.getElementById('table-wrap').style.display = 'none';
+  document.getElementById('summary-bar').style.display = 'none';
+  document.getElementById('risk-panel').style.display = 'none';
+
+  let allRows = [], from = 0;
+  const pageSize = 1000;
+  while (true) {
+    const res = await fetch(
+      `${SUPABASE_URL}/rest/v1/wb_stocks?shop=eq.${SHOP}&order=date.asc,article.asc&limit=${pageSize}&offset=${from}`,
+      { headers: { 'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + SUPABASE_KEY } }
+    );
+    const rows = await res.json();
+    if (!rows || rows.length === 0) break;
+    allRows = allRows.concat(rows);
+    if (rows.length < pageSize) break;
+    from += pageSize;
+  }
+
+  // Build pivot
+  const pivot = {};
+  const dateSet = new Set();
+  for (const row of allRows) {
+    if (row.article === '__empty__') continue;
+    dateSet.add(row.date);
+    if (!pivot[row.article]) pivot[row.article] = {};
+    pivot[row.article][row.date] = row.quantity;
+  }
+
+  const dates = Array.from(dateSet).sort();
+  lastDates = dates;
+  lastPivot = pivot;
+
+  const today = dates[dates.length - 1] || '';
+  // Все артикулы из базы (без фильтра по списку)
+  const articles = Object.keys(pivot).sort();
+
+  // --- Risk calculation ---
+  const riskMap = {};
+  for (const art of articles) {
+    const currStock = (pivot[art] && pivot[art][today]) || 0;
+    const recent = dates.slice(-8);
+    let totalDrop = 0, countDays = 0;
+    for (let i = 1; i < recent.length; i++) {
+      const prev = (pivot[art] && pivot[art][recent[i-1]]) || 0;
+      const curr = (pivot[art] && pivot[art][recent[i]]) || 0;
+      const drop = prev - curr;
+      if (drop > 0) { totalDrop += drop; countDays++; }
+    }
+    const avgSales = countDays > 0 ? totalDrop / countDays : 0;
+    const daysLeft = avgSales > 0 ? Math.floor(currStock / avgSales) : (currStock > 0 ? 999 : 0);
+    if (daysLeft < RISK_DAYS || currStock === 0) {
+      riskMap[art] = { daysLeft, avgSales: Math.round(avgSales * 10) / 10, currStock };
+    }
+  }
+  lastRiskItems = Object.entries(riskMap).sort((a,b) => a[1].daysLeft - b[1].daysLeft);
+
+  // --- New arrival detection ---
+  const newArrival = new Set();
+  for (const art of articles) {
+    for (let i = 1; i < dates.length; i++) {
+      const prev = (pivot[art] && pivot[art][dates[i-1]]) || 0;
+      const curr = (pivot[art] && pivot[art][dates[i]]) || 0;
+      if (prev === 0 && curr > 0) newArrival.add(art + '|' + dates[i]);
+    }
+  }
+
+  // --- Summary ---
+  const inStockCount = articles.filter(a => ((pivot[a] && pivot[a][today]) || 0) > 0).length;
+  const zeroCount = articles.length - inStockCount;
+  const riskCount = lastRiskItems.length;
+  const pct = articles.length > 0 ? Math.round(inStockCount / articles.length * 100) : 0;
+
+  document.getElementById('sc-instock-val').textContent = pct + '%';
+  document.getElementById('sc-instock-sub').textContent = `${inStockCount} из ${articles.length} артикулов`;
+  document.getElementById('progress-fill').style.width = pct + '%';
+  document.getElementById('progress-fill').style.background = pct > 70 ? '#05d69e' : pct > 40 ? '#ffc442' : '#ff4d4d';
+  document.getElementById('sc-zero-val').textContent = zeroCount;
+  document.getElementById('sc-zero-sub').textContent = zeroCount > 0 ? 'позиций без остатков' : '✓ все в наличии';
+  document.getElementById('sc-risk-val').textContent = riskCount;
+  document.getElementById('sc-risk-sub').textContent = riskCount > 0 ? 'нужна поставка' : '✓ запасов хватает';
+  document.getElementById('summary-bar').style.display = 'flex';
+  document.getElementById('info').textContent = `${articles.length} артикулов · ${dates.length} дней`;
+
+  // --- Risk panel ---
+  if (lastRiskItems.length > 0) {
+    document.getElementById('risk-count').textContent = lastRiskItems.length;
+    document.getElementById('risk-items').innerHTML = lastRiskItems.map(([art, r]) => {
+      const isCritical = r.daysLeft <= 3 || r.currStock === 0;
+      const daysText = r.currStock === 0 ? '🔴 Нет остатков' :
+        r.daysLeft === 999 ? '❓ Нет данных о продажах' :
+        `${r.daysLeft <= 3 ? '🔴' : '🟡'} ~${r.daysLeft} дн. до нуля`;
+      return `<div class="risk-item${isCritical ? ' critical' : ''}">
+        <div class="ri-name">${art}</div>
+        <div class="ri-days ${isCritical ? 'critical' : 'warning'}">${daysText}</div>
+        <div class="ri-stock">На складе: ${r.currStock} шт · Продаж/день: ~${r.avgSales}</div>
+      </div>`;
+    }).join('');
+    document.getElementById('risk-panel').style.display = 'block';
+  }
+
+  // --- Render table ---
+  const fmtDate = d => { const [y,m,day] = d.split('-'); return `${parseInt(day)}/${parseInt(m)}`; };
+
+  const filteredArticles = currentView === 'risk'
+    ? articles.filter(a => riskMap[a])
+    : articles;
+
+  document.getElementById('thead').innerHTML = `<tr>
+    <th class="art-col">Артикул товара</th>
+    ${dates.map(d => `<th${d === today ? ' class="today-col"' : ''}>${fmtDate(d)}</th>`).join('')}
+  </tr>`;
+
+  document.getElementById('tbody').innerHTML = filteredArticles.map(art => {
+    const isRisk = !!riskMap[art];
+    const cells = dates.map(d => {
+      const qty = (pivot[art] && pivot[art][d]) || 0;
+      const key = art + '|' + d;
+      const isToday = d === today;
+      let cls;
+      if (newArrival.has(key)) cls = 'qty-new';
+      else if (qty > 50) cls = 'qty-high';
+      else if (qty >= 10) cls = 'qty-mid';
+      else if (qty > 0) cls = 'qty-low';
+      else cls = 'qty-zero';
+      const todayCls = isToday ? ' qty-today' : '';
+      return `<td class="qty ${cls}${todayCls}">${qty}</td>`;
+    }).join('');
+    return `<tr class="${isRisk ? 'risk-row-tr' : ''}">
+      <td class="art-col${isRisk ? ' risk-row' : ''}">${art}</td>${cells}
+    </tr>`;
+  }).join('');
+
+  document.getElementById('loading').style.display = 'none';
+  document.getElementById('table-wrap').style.display = 'block';
+}
+
+function setView(view, el) {
+  currentView = view;
+  document.querySelectorAll('.view-tab').forEach(t => t.classList.remove('active'));
+  el.classList.add('active');
+  loadStocks();
+}
+
+let riskOpen = true;
+function toggleRisk() {
+  riskOpen = !riskOpen;
+  document.getElementById('risk-body').style.display = riskOpen ? 'block' : 'none';
+  document.getElementById('risk-toggle').textContent = riskOpen ? '▼ скрыть' : '▶ показать';
+}
+
+async function runStocksAI() {
+  const btn = document.getElementById('ai-btn');
+  const panel = document.getElementById('ai-panel');
+
+  btn.disabled = true;
+  btn.textContent = '⏳ Анализирую...';
+  document.getElementById('ai-section').style.display = 'block';
+  panel.innerHTML = 'Собираю данные...';
+
+  const dates = lastDates;
+  const pivot = lastPivot;
+  const articles = Object.keys(pivot).sort();
+  const today = dates[dates.length - 1] || '';
+
+  if (dates.length < 3) {
+    panel.innerHTML = 'Недостаточно данных — нужно минимум 3 дня. Данные накапливаются ежедневно.';
+    btn.disabled = false;
+    btn.textContent = '✨ AI-анализ склада';
+    return;
+  }
+
+  // Build per-article stats
+  const artStats = [];
+  for (const art of articles) {
+    const stockToday = (pivot[art]?.[today]) || 0;
+    const deltas = [];
+    for (let i = 1; i < dates.length; i++) {
+      const prev = pivot[art]?.[dates[i-1]] || 0;
+      const curr = pivot[art]?.[dates[i]] || 0;
+      deltas.push({ date: dates[i], delta: curr - prev, prev, curr });
+    }
+    const drops = deltas.filter(d => d.delta < 0);
+    const restocks = deltas.filter(d => d.delta > 0);
+    const avgSalesPerDay = drops.length > 0
+      ? Math.round(-drops.reduce((s, d) => s + d.delta, 0) / drops.length * 10) / 10
+      : 0;
+    const recent3 = drops.filter(d => dates.indexOf(d.date) >= dates.length - 3);
+    const prev3 = drops.filter(d => {
+      const i = dates.indexOf(d.date);
+      return i >= dates.length - 6 && i < dates.length - 3;
+    });
+    const recentAvg = recent3.length > 0 ? -recent3.reduce((s,d) => s+d.delta, 0)/recent3.length : 0;
+    const prevAvg = prev3.length > 0 ? -prev3.reduce((s,d) => s+d.delta, 0)/prev3.length : 0;
+    const trendPct = prevAvg > 0 ? Math.round((recentAvg - prevAvg) / prevAvg * 100) : null;
+    const daysLeft = avgSalesPerDay > 0 ? Math.floor(stockToday / avgSalesPerDay) : (stockToday > 0 ? 999 : 0);
+    artStats.push({ art, stockToday, avgSalesPerDay, daysLeft, trendPct,
+      lastRestock: restocks.length > 0 ? restocks[restocks.length-1].date : null,
+      hasData: drops.length > 0 });
+  }
+
+  const critical = artStats.filter(a => a.daysLeft <= 5 && a.stockToday >= 0).sort((a,b) => a.daysLeft - b.daysLeft);
+  const warning  = artStats.filter(a => a.daysLeft > 5 && a.daysLeft <= 14).sort((a,b) => a.daysLeft - b.daysLeft);
+  const trending = artStats.filter(a => a.trendPct !== null && Math.abs(a.trendPct) >= 50);
+  const stagnant = artStats.filter(a => a.avgSalesPerDay === 0 && a.stockToday > 0 && a.hasData);
+  const zeros    = artStats.filter(a => a.stockToday === 0);
+
+  const lines = [];
+  lines.push(`Магазин: Никита (Wildberries)`);
+  lines.push(`Период данных: ${dates[0]} — ${today} (${dates.length} дней)`);
+  lines.push(`Всего артикулов: ${articles.length}`);
+  lines.push('');
+  lines.push('КРИТИЧЕСКИЕ (менее 5 дней до нуля):');
+  critical.forEach(a => lines.push(`  ${a.art}: ${a.stockToday} шт, ~${a.avgSalesPerDay}/день, осталось ~${a.daysLeft === 999 ? '∞' : a.daysLeft} дней`));
+  if (critical.length === 0) lines.push('  нет');
+  lines.push('');
+  lines.push('ЗОНА РИСКА (5–14 дней):');
+  warning.forEach(a => lines.push(`  ${a.art}: ${a.stockToday} шт, ~${a.avgSalesPerDay}/день, осталось ~${a.daysLeft} дней`));
+  if (warning.length === 0) lines.push('  нет');
+  lines.push('');
+  lines.push('НУЛЕВЫЕ ОСТАТКИ:');
+  zeros.forEach(a => lines.push(`  ${a.art}: 0 шт (продажи были: ${a.avgSalesPerDay > 0 ? '~'+a.avgSalesPerDay+'/день' : 'нет данных'})`));
+  if (zeros.length === 0) lines.push('  нет');
+  lines.push('');
+  lines.push('РЕЗКОЕ ИЗМЕНЕНИЕ ПРОДАЖ (последние 3 дня vs предыдущие 3 дня):');
+  trending.forEach(a => {
+    const dir = a.trendPct > 0 ? '⬆ рост' : '⬇ падение';
+    lines.push(`  ${a.art}: ${dir} ${Math.abs(a.trendPct)}%, сейчас ~${a.avgSalesPerDay}/день, остаток ${a.stockToday} шт`);
+  });
+  if (trending.length === 0) lines.push('  нет значимых изменений');
+  lines.push('');
+  lines.push('ТОВАРЫ БЕЗ ДВИЖЕНИЯ (есть остаток, нет продаж):');
+  stagnant.slice(0, 10).forEach(a => lines.push(`  ${a.art}: ${a.stockToday} шт`));
+  if (stagnant.length === 0) lines.push('  нет');
+
+  const prompt = `Ты — эксперт по управлению складом и товарными запасами для магазинов на Wildberries.
+Проанализируй данные по остаткам и дай конкретные рекомендации:
+
+${lines.join('\n')}
+
+Структурируй ответ в HTML (используй <b>, <br>, без markdown):
+
+<b>🚨 Срочно завезти</b><br>
+— артикулы которые закончатся в ближайшие дни, конкретные объёмы поставки<br>
+<br>
+<b>📦 Запланировать поставку</b><br>
+— артикулы в зоне риска, рекомендуемые сроки<br>
+<br>
+<b>📈 Растущие позиции</b><br>
+— где продажи ускорились, нужно ли нарастить запас<br>
+<br>
+<b>❄️ Замороженный товар</b><br>
+— что лежит без движения, что с этим делать<br>
+<br>
+<b>💡 Общие рекомендации</b><br>
+— 2-3 стратегических совета<br>
+
+Будь конкретным. Указывай артикулы и цифры. Пиши по-русски кратко.`;
+
+  try {
+    const res = await fetch('https://wbtrenz.app.n8n.cloud/webhook/wb-ai-v7', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ prompt })
+    });
+    const data = await res.json();
+    const text = data.result || JSON.stringify(data);
+    panel.innerHTML = text;
+  } catch(e) {
+    panel.innerHTML = 'Ошибка: ' + e.message;
+  }
+
+  btn.disabled = false;
+  btn.textContent = '🔄 Обновить анализ';
+}
+
+loadStocks();
+</script>
+</body>
+</html>

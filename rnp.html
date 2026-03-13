@@ -1,0 +1,757 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>РнП — Рука на Пульсе</title>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Geologica:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #080c10; --s1: #0d1117; --s2: #111820; --border: #1a2333;
+    --wb: #cb11ab; --green: #05d69e; --yellow: #ffc442; --red: #ff4f6e; --blue: #3b9eff;
+    --text: #dde4ee; --muted: #4a5568; --muted2: #718096;
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { font-family:'Geologica',sans-serif; background:var(--bg); color:var(--text); min-height:100vh; }
+  body::before { content:''; position:fixed; inset:0; background-image:linear-gradient(rgba(203,17,171,0.03) 1px,transparent 1px),linear-gradient(90deg,rgba(203,17,171,0.03) 1px,transparent 1px); background-size:48px 48px; pointer-events:none; z-index:0; }
+  .wrap { position:relative; z-index:1; max-width:1360px; margin:0 auto; padding:24px; }
+
+  /* Month tabs */
+  .month-tabs { display:flex; gap:6px; margin-bottom:24px; flex-wrap:wrap; }
+  .month-tab { padding:7px 18px; background:var(--s1); border:1px solid var(--border); border-radius:8px; font-size:13px; font-weight:600; color:var(--muted2); cursor:pointer; transition:all .2s; }
+  .month-tab.active { background:var(--wb); border-color:var(--wb); color:#fff; }
+  .month-tab:hover:not(.active) { color:var(--text); border-color:var(--muted); }
+
+  /* Plan editor */
+  .plan-bar { background:var(--s1); border:1px solid var(--border); border-radius:14px; padding:18px 24px; margin-bottom:24px; display:flex; align-items:center; gap:24px; flex-wrap:wrap; }
+  .plan-bar h3 { font-size:12px; font-weight:700; letter-spacing:1px; text-transform:uppercase; color:var(--muted2); margin-right:8px; }
+  .plan-field { display:flex; flex-direction:column; gap:4px; }
+  .plan-field label { font-size:10px; color:var(--muted); text-transform:uppercase; letter-spacing:1px; }
+  .plan-field input { background:var(--s2); border:1px solid var(--border); border-radius:8px; padding:7px 12px; color:var(--text); font-size:14px; font-weight:700; width:160px; font-family:'Geologica',sans-serif; }
+  .plan-field input:focus { outline:none; border-color:var(--wb); }
+  .plan-field .computed { font-size:13px; font-weight:700; color:var(--yellow); padding:7px 12px; }
+  .plan-save { margin-left:auto; background:var(--wb); border:none; border-radius:8px; padding:9px 20px; color:#fff; font-size:13px; font-weight:700; cursor:pointer; font-family:'Geologica',sans-serif; transition:opacity .2s; }
+  .plan-save:hover { opacity:0.85; }
+  .plan-saved { font-size:12px; color:var(--green); margin-left:8px; opacity:0; transition:opacity .3s; }
+
+  /* Tempo cards */
+  .tempo-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:16px; margin-bottom:24px; }
+  .tempo-card { background:var(--s1); border:1px solid var(--border); border-radius:14px; padding:20px 22px; }
+  .tempo-card .tc-label { font-size:11px; font-weight:700; letter-spacing:1px; text-transform:uppercase; color:var(--muted2); margin-bottom:10px; }
+  .tempo-card .tc-fact { font-family:'Bebas Neue'; font-size:36px; letter-spacing:1px; line-height:1; }
+  .tempo-card .tc-plan { font-size:12px; color:var(--muted2); margin-top:4px; }
+  .tempo-card .tc-pct { font-size:13px; font-weight:700; margin-top:8px; }
+  .progress { height:5px; background:var(--border); border-radius:3px; margin-top:10px; overflow:hidden; }
+  .progress-fill { height:100%; border-radius:3px; transition:width .8s ease; }
+  .tempo-card .tc-tempo { margin-top:10px; padding:8px 12px; border-radius:8px; font-size:12px; font-weight:700; }
+  .tempo-ok   { background:rgba(5,214,158,0.12); color:var(--green); border:1px solid rgba(5,214,158,0.2); }
+  .tempo-warn { background:rgba(255,196,66,0.12); color:var(--yellow); border:1px solid rgba(255,196,66,0.2); }
+  .tempo-bad  { background:rgba(255,79,110,0.12); color:var(--red); border:1px solid rgba(255,79,110,0.2); }
+
+  /* View toggle */
+  .view-toggle { display:flex; gap:6px; margin-bottom:16px; }
+  .vt { padding:7px 18px; background:var(--s1); border:1px solid var(--border); border-radius:8px; font-size:13px; font-weight:600; color:var(--muted2); cursor:pointer; transition:all .2s; }
+  .vt.active { background:var(--s2); border-color:var(--muted); color:var(--text); }
+
+  /* AI Analysis */
+  .ai-wrap { background:var(--s1); border:1px solid var(--border); border-radius:14px; padding:24px; margin-bottom:24px; }
+  .ai-header { display:flex; align-items:center; justify-content:space-between; margin-bottom:16px; }
+  .ai-title { font-size:13px; font-weight:700; color:var(--muted2); text-transform:uppercase; letter-spacing:1px; }
+  .ai-btn { background:var(--wb); border:none; border-radius:8px; padding:9px 20px; color:#fff; font-size:13px; font-weight:700; cursor:pointer; font-family:'Geologica',sans-serif; transition:opacity .2s; display:flex; align-items:center; gap:8px; }
+  .ai-btn:hover { opacity:0.85; }
+  .ai-btn:disabled { opacity:0.5; cursor:default; }
+  .ai-body { font-size:14px; line-height:1.7; color:var(--text); }
+  .ai-body.empty { color:var(--muted2); font-size:13px; }
+
+  /* AI Chat */
+  .ai-chat { display:flex; flex-direction:column; gap:12px; }
+  .ai-bubble { display:flex; gap:10px; align-items:flex-start; }
+  .ai-bubble.user { flex-direction:row-reverse; }
+  .ai-bubble-avatar { width:28px; height:28px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:13px; flex-shrink:0; margin-top:2px; }
+  .ai-bubble.bot .ai-bubble-avatar { background:var(--wb); }
+  .ai-bubble.user .ai-bubble-avatar { background:var(--s2); border:1px solid var(--border); }
+  .ai-bubble-text { max-width:88%; padding:10px 14px; border-radius:12px; font-size:13.5px; line-height:1.65; }
+  .ai-bubble.bot .ai-bubble-text { background:var(--s2); color:var(--text); border-radius:4px 12px 12px 12px; }
+  .ai-bubble.user .ai-bubble-text { background:var(--wb); color:#fff; border-radius:12px 4px 12px 12px; opacity:0.92; }
+  .ai-bubble.typing .ai-bubble-text { color:var(--muted2); font-style:italic; }
+  .ai-followup { display:flex; gap:8px; margin-top:16px; padding-top:14px; border-top:1px solid var(--border); }
+  .ai-followup-input { flex:1; background:var(--s2); border:1px solid var(--border); border-radius:8px; padding:9px 14px; color:var(--text); font-size:13px; font-family:'Geologica',sans-serif; }
+  .ai-followup-input:focus { outline:none; border-color:var(--wb); }
+  .ai-followup-input::placeholder { color:var(--muted2); }
+  .ai-followup-btn { background:var(--wb); border:none; border-radius:8px; padding:9px 16px; color:#fff; font-size:18px; cursor:pointer; transition:opacity .2s; line-height:1; }
+  .ai-followup-btn:hover { opacity:0.85; }
+  .ai-followup-btn:disabled { opacity:0.4; cursor:default; }
+  .ai-suggestions { display:flex; flex-wrap:wrap; gap:8px; margin-top:10px; }
+  .ai-suggestion-chip { background:var(--s2); border:1px solid var(--border); border-radius:20px; padding:6px 14px; font-size:12px; color:var(--muted2); cursor:pointer; font-family:'Geologica',sans-serif; transition:all .2s; white-space:nowrap; }
+  .ai-suggestion-chip:hover { border-color:var(--wb); color:var(--text); background:var(--s1); }
+
+  /* Chart */
+  .chart-wrap { background:var(--s1); border:1px solid var(--border); border-radius:14px; padding:24px; margin-bottom:24px; }
+  .chart-title { font-size:13px; font-weight:700; color:var(--muted2); text-transform:uppercase; letter-spacing:1px; margin-bottom:20px; }
+  .chart-legend { display:flex; gap:20px; margin-bottom:16px; }
+  .chart-legend-item { display:flex; align-items:center; gap:6px; font-size:12px; color:var(--muted2); }
+  .chart-legend-dot { width:10px; height:10px; border-radius:50%; }
+  .chart-area { position:relative; height:280px; }
+
+  /* Table */
+  .tbl-wrap { background:var(--s1); border:1px solid var(--border); border-radius:14px; overflow:hidden; margin-bottom:24px; }
+  table { width:100%; border-collapse:collapse; font-size:13px; }
+  th { background:var(--s2); padding:12px 16px; text-align:left; font-size:11px; font-weight:700; letter-spacing:1px; text-transform:uppercase; color:var(--muted2); border-bottom:1px solid var(--border); }
+  th:not(:first-child) { text-align:right; }
+  td { padding:11px 16px; border-bottom:1px solid rgba(26,35,51,0.7); }
+  td:not(:first-child) { text-align:right; font-weight:600; }
+  tr:last-child td { border-bottom:none; }
+  tr.today-row td { background:rgba(203,17,171,0.06); }
+  tr:hover td { background:var(--s2); }
+  .td-date { color:var(--muted2); font-weight:500; }
+  .td-today-badge { background:var(--wb); color:#fff; font-size:10px; padding:1px 6px; border-radius:4px; margin-left:6px; }
+
+  /* Journal */
+  .journal-wrap { background:var(--s1); border:1px solid var(--border); border-radius:14px; padding:20px 24px; margin-bottom:24px; }
+  .journal-header { display:flex; align-items:center; justify-content:space-between; margin-bottom:14px; cursor:pointer; user-select:none; }
+  .journal-title { font-size:13px; font-weight:700; color:var(--muted2); text-transform:uppercase; letter-spacing:1px; }
+  .journal-toggle { font-size:12px; color:var(--muted2); }
+  .journal-form { display:flex; gap:10px; margin-bottom:14px; flex-wrap:wrap; }
+  .journal-date-input { background:var(--s2); border:1px solid var(--border); border-radius:8px; padding:7px 12px; color:var(--text); font-size:13px; font-family:'Geologica',sans-serif; width:140px; }
+  .journal-text-input { background:var(--s2); border:1px solid var(--border); border-radius:8px; padding:7px 12px; color:var(--text); font-size:13px; font-family:'Geologica',sans-serif; flex:1; min-width:200px; }
+  .journal-date-input:focus, .journal-text-input:focus { outline:none; border-color:var(--wb); }
+  .journal-save { background:var(--wb); border:none; border-radius:8px; padding:8px 16px; color:#fff; font-size:13px; font-weight:700; cursor:pointer; font-family:'Geologica',sans-serif; white-space:nowrap; }
+  .journal-save:hover { opacity:0.85; }
+  .journal-list { display:flex; flex-direction:column; gap:6px; max-height:220px; overflow-y:auto; }
+  .journal-entry { display:flex; gap:10px; align-items:flex-start; padding:8px 10px; background:var(--s2); border-radius:8px; font-size:13px; }
+  .journal-entry-date { color:var(--muted2); font-weight:600; white-space:nowrap; min-width:80px; }
+  .journal-entry-note { color:var(--text); flex:1; line-height:1.4; }
+  .journal-entry-del { color:var(--muted); cursor:pointer; font-size:16px; line-height:1; opacity:0.5; }
+  .journal-entry-del:hover { opacity:1; color:var(--red); }
+  .journal-empty { color:var(--muted2); font-size:13px; }
+  .journal-saved { font-size:12px; color:var(--green); margin-left:8px; opacity:0; transition:opacity .3s; }
+
+  .loading { text-align:center; padding:60px; color:var(--muted2); }
+  .spinner { width:32px; height:32px; border:3px solid var(--border); border-top-color:var(--wb); border-radius:50%; animation:spin .8s linear infinite; margin:0 auto 12px; }
+  @keyframes spin { to { transform:rotate(360deg) } }
+</style>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+</head>
+<body>
+<script src="header.js" defer></script>
+
+<div class="wrap">
+  <div id="loading" class="loading"><div class="spinner"></div>Загружаем данные...</div>
+  <div id="app" style="display:none">
+
+    <!-- Month tabs -->
+    <div class="month-tabs" id="month-tabs"></div>
+
+    <!-- Plan editor -->
+    <div class="plan-bar">
+      <h3>📋 План</h3>
+      <div class="plan-field">
+        <label>Заказы (₽)</label>
+        <input type="number" id="plan-orders" placeholder="0">
+      </div>
+      <div class="plan-field">
+        <label>Продажи (₽)</label>
+        <input type="number" id="plan-sales" placeholder="0">
+      </div>
+      <div class="plan-field">
+        <label>ДРР (%)</label>
+        <input type="number" id="plan-drr" placeholder="10" step="0.1" style="width:90px">
+      </div>
+      <div class="plan-field">
+        <label>Рекл. бюджет (₽)</label>
+        <div class="computed" id="plan-ads-computed">—</div>
+      </div>
+      <button class="plan-save" onclick="savePlan()">Сохранить</button>
+      <span class="plan-saved" id="plan-saved">✓ Сохранено</span>
+    </div>
+
+    <!-- Tempo -->
+    <div class="tempo-grid" id="tempo-grid"></div>
+
+    <!-- Toggle -->
+    <div class="view-toggle">
+      <div class="vt active" onclick="setView('table',this)">📋 Таблица</div>
+      <div class="vt" onclick="setView('chart',this)">📈 График</div>
+    </div>
+
+    <!-- Chart -->
+    <div class="chart-wrap" id="chart-wrap" style="display:none">
+      <div class="chart-title">Динамика за месяц</div>
+      <div class="chart-legend">
+        <div class="chart-legend-item"><div class="chart-legend-dot" style="background:#cb11ab"></div>Заказы ₽</div>
+        <div class="chart-legend-item"><div class="chart-legend-dot" style="background:#05d69e"></div>Продажи ₽</div>
+        <div class="chart-legend-item"><div class="chart-legend-dot" style="background:#ffc442"></div>Реклама ₽</div>
+      </div>
+      <div class="chart-area" id="chart-area"><canvas id="myChart"></canvas></div>
+    </div>
+
+    <!-- Table -->
+    <div class="tbl-wrap" id="tbl-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Дата</th>
+            <th>Заказы шт</th><th>Заказы ₽</th>
+            <th>Продажи шт</th><th>Продажи ₽</th>
+            <th>Реклама ₽</th><th>ДРР</th>
+          </tr>
+        </thead>
+        <tbody id="tbl-body"></tbody>
+      </table>
+    </div>
+
+  </div><!-- /app -->
+</div>
+
+<script>
+// ⚙️ Заменить после создания Supabase проекта:
+const SUPABASE_URL = 'YOUR_SUPABASE_URL';
+const SUPABASE_KEY = 'YOUR_SUPABASE_ANON_KEY';
+const SB_HEADERS = { 'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + SUPABASE_KEY };
+
+const SHOP = 'nikita';
+
+let currentMonth = '';
+let plan = { orders_plan: 0, sales_plan: 0, drr_plan: 10 };
+let journalOpen = true;
+let journalEntries = [];
+let aiMessages = [];
+let currentView = 'table';
+
+const fmtRub = n => new Intl.NumberFormat('ru-RU').format(Math.round(n)) + ' ₽';
+const fmtN   = n => new Intl.NumberFormat('ru-RU').format(Math.round(n));
+const fmtPct = n => (n || 0).toFixed(1) + '%';
+
+async function sbGet(path) {
+  const r = await fetch(SUPABASE_URL + path, { headers: SB_HEADERS });
+  return r.json();
+}
+async function sbPost(path, body) {
+  return fetch(SUPABASE_URL + path, {
+    method: 'POST', headers: { ...SB_HEADERS, 'Content-Type': 'application/json', 'Prefer': 'resolution=merge-duplicates' },
+    body: JSON.stringify(body)
+  });
+}
+
+function getMonths() {
+  const months = [];
+  const now = new Date();
+  for (let i = 0; i < 4; i++) {
+    const date = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    const my = date.getFullYear();
+    const mm = String(date.getMonth() + 1).padStart(2, '0');
+    months.push(`${my}-${mm}`);
+  }
+  return months;
+}
+
+function fmtMonthLabel(m) {
+  const [y, mo] = m.split('-');
+  const names = ['Янв','Фев','Мар','Апр','Май','Июн','Июл','Авг','Сен','Окт','Ноя','Дек'];
+  return names[parseInt(mo) - 1] + ' ' + y;
+}
+
+async function loadPlan(month) {
+  const rows = await sbGet(`/rest/v1/wb_plan?month=eq.${month}&limit=1`);
+  if (rows && rows.length > 0) {
+    plan = rows[0];
+  } else {
+    plan = { month, orders_plan: 0, sales_plan: 0, drr_plan: 10 };
+  }
+  document.getElementById('plan-orders').value = plan.orders_plan || '';
+  document.getElementById('plan-sales').value  = plan.sales_plan  || '';
+  document.getElementById('plan-drr').value    = plan.drr_plan    || 10;
+  updateAdsComputed();
+}
+
+function updateAdsComputed() {
+  const sales = parseFloat(document.getElementById('plan-sales').value) || 0;
+  const drr   = parseFloat(document.getElementById('plan-drr').value)   || 0;
+  const ads   = Math.round(sales * drr / 100);
+  document.getElementById('plan-ads-computed').textContent = ads > 0 ? fmtRub(ads) : '—';
+}
+document.getElementById('plan-sales').addEventListener('input', updateAdsComputed);
+document.getElementById('plan-drr').addEventListener('input', updateAdsComputed);
+
+async function savePlan() {
+  const body = {
+    month: currentMonth,
+    orders_plan: parseFloat(document.getElementById('plan-orders').value) || 0,
+    sales_plan:  parseFloat(document.getElementById('plan-sales').value)  || 0,
+    drr_plan:    parseFloat(document.getElementById('plan-drr').value)    || 10,
+    updated_at:  new Date().toISOString()
+  };
+  await sbPost('/rest/v1/wb_plan?on_conflict=month', body);
+  plan = body;
+  const s = document.getElementById('plan-saved');
+  s.style.opacity = 1;
+  setTimeout(() => s.style.opacity = 0, 2000);
+  renderTempo(window._rows || []);
+}
+
+async function loadData(month) {
+  const [y, m] = month.split('-');
+  const from = `${month}-01`;
+  const lastDay = new Date(parseInt(y), parseInt(m), 0).getDate();
+  const to   = `${month}-${String(lastDay).padStart(2,'0')}`;
+
+  const rows = await sbGet(
+    `/rest/v1/wb_rnp?shop=eq.${SHOP}&date=gte.${from}&date=lte.${to}&order=date.asc&limit=200`
+  );
+  return (rows || []).map(r => ({
+    date: r.date,
+    orders_count: r.orders_count || 0,
+    orders_sum:   r.orders_sum   || 0,
+    sales_count:  r.sales_count  || 0,
+    sales_sum:    r.sales_sum    || 0,
+    ads_spend:    r.ads_spend    || 0,
+  }));
+}
+
+function renderTempo(rows) {
+  const today = new Date().toISOString().slice(0, 10);
+  const [y, m] = currentMonth.split('-');
+  const totalDays  = new Date(parseInt(y), parseInt(m), 0).getDate();
+  const completedRows = rows.filter(r => r.date < today);
+  const passedDays = completedRows.length || 1;
+
+  const factOrders = completedRows.reduce((s,r) => s + r.orders_sum, 0);
+  const factSales  = completedRows.reduce((s,r) => s + r.sales_sum, 0);
+  const factAds    = completedRows.reduce((s,r) => s + r.ads_spend, 0);
+
+  const planOrders = plan.orders_plan || 1;
+  const planSales  = plan.sales_plan  || 1;
+  const planDrr    = plan.drr_plan    || 10;
+
+  const tempoOrders = totalDays > 0 ? (factOrders / passedDays) * totalDays : 0;
+  const tempoSales  = totalDays > 0 ? (factSales  / passedDays) * totalDays : 0;
+
+  const pctOrders = planOrders > 0 ? factOrders / planOrders * 100 : 0;
+  const pctSales  = planSales  > 0 ? factSales  / planSales  * 100 : 0;
+  const factDrr = factOrders > 0 ? factAds / factOrders * 100 : 0;
+
+  function tempoClass(tempo, planVal, inverse=false) {
+    const ratio = planVal > 0 ? tempo / planVal : 0;
+    if (inverse) {
+      if (ratio <= 1.0)  return 'tempo-ok';
+      if (ratio <= 1.10) return 'tempo-warn';
+      return 'tempo-bad';
+    }
+    if (ratio >= 0.95) return 'tempo-ok';
+    if (ratio >= 0.7)  return 'tempo-warn';
+    return 'tempo-bad';
+  }
+  function tempoText(tempo, planVal) {
+    const ratio = planVal > 0 ? tempo / planVal * 100 : 0;
+    return `Идём на ${ratio.toFixed(0)}% плана`;
+  }
+  function colorByTempo(tempo, planVal) {
+    const ratio = planVal > 0 ? tempo / planVal : 0;
+    if (ratio >= 0.95) return 'var(--green)';
+    if (ratio >= 0.7)  return 'var(--yellow)';
+    return 'var(--red)';
+  }
+  const adsColor = factDrr <= planDrr ? 'var(--green)' : factDrr <= planDrr * 1.10 ? 'var(--yellow)' : 'var(--red)';
+  const adsTempoClass = factDrr <= planDrr ? 'tempo-ok' : factDrr <= planDrr * 1.10 ? 'tempo-warn' : 'tempo-bad';
+
+  const cards = [
+    { label:'Заказы',  fact:fmtRub(factOrders), planLabel:'план: '+fmtRub(planOrders), barW:Math.min(pctOrders,100), barColor:colorByTempo(tempoOrders,planOrders), pctLabel:fmtPct(pctOrders)+' выполнено', tempoClass:tempoClass(tempoOrders,planOrders), tempoLabel:tempoText(tempoOrders,planOrders) },
+    { label:'Продажи', fact:fmtRub(factSales),  planLabel:'план: '+fmtRub(planSales),  barW:Math.min(pctSales,100),  barColor:colorByTempo(tempoSales,planSales),   pctLabel:fmtPct(pctSales)+' выполнено',  tempoClass:tempoClass(tempoSales,planSales),   tempoLabel:tempoText(tempoSales,planSales) },
+    { label:'Реклама', fact:fmtRub(factAds),    planLabel:'план ДРР: '+planDrr+'%',    barW:Math.min(factDrr/planDrr*100,200)/2, barColor:adsColor, pctLabel:'ДРР: '+fmtPct(factDrr), tempoClass:adsTempoClass, tempoLabel:'факт '+fmtPct(factDrr)+' / план '+planDrr+'%' },
+  ];
+
+  document.getElementById('tempo-grid').innerHTML = cards.map(c => `
+    <div class="tempo-card">
+      <div class="tc-label">${c.label}</div>
+      <div class="tc-fact" style="color:var(--text)">${c.fact}</div>
+      <div class="tc-plan">${c.planLabel}</div>
+      <div class="progress"><div class="progress-fill" style="width:${c.barW}%;background:${c.barColor}"></div></div>
+      <div class="tc-pct" style="color:${c.barColor}">${c.pctLabel}</div>
+      <div class="tc-tempo ${c.tempoClass}">${c.tempoLabel}</div>
+    </div>
+  `).join('');
+}
+
+function renderChart(rows) {
+  const labels = rows.map(r => {
+    const d = new Date(r.date + 'T12:00:00');
+    return d.toLocaleDateString('ru-RU', {day:'2-digit', month:'short'}).replace(' ', '\u00a0');
+  });
+  function fmtAxis(v) {
+    if (v >= 1000000) return (v/1000000).toFixed(1).replace('.0','') + 'М';
+    if (v >= 1000)    return Math.round(v/1000) + 'К';
+    return String(v);
+  }
+  const canvas = document.getElementById('myChart');
+  if (window._chartInstance) { window._chartInstance.destroy(); }
+  window._chartInstance = new Chart(canvas, {
+    type: 'line',
+    data: {
+      labels,
+      datasets: [
+        { label:'Заказы ₽',  data:rows.map(r=>r.orders_sum), borderColor:'#cb11ab', backgroundColor:'rgba(203,17,171,0.08)', pointBackgroundColor:'#cb11ab', pointRadius:5, pointHoverRadius:7, tension:0.4, fill:false, borderWidth:2.5 },
+        { label:'Продажи ₽', data:rows.map(r=>r.sales_sum),  borderColor:'#05d69e', backgroundColor:'rgba(5,214,158,0.08)',  pointBackgroundColor:'#05d69e', pointRadius:5, pointHoverRadius:7, tension:0.4, fill:false, borderWidth:2.5 },
+        { label:'Реклама ₽', data:rows.map(r=>r.ads_spend),  borderColor:'#ffc442', backgroundColor:'rgba(255,196,66,0.08)', pointBackgroundColor:'#ffc442', pointRadius:5, pointHoverRadius:7, tension:0.4, fill:false, borderWidth:2.5 },
+      ]
+    },
+    options: {
+      responsive:true, maintainAspectRatio:false,
+      interaction:{ mode:'index', intersect:false },
+      plugins: {
+        legend:{ display:false },
+        tooltip:{ backgroundColor:'#1e2a3a', borderColor:'#2a3a4a', borderWidth:1, titleColor:'#dde4ee', bodyColor:'#a0aec0', padding:12,
+          callbacks:{ label: ctx => ` ${ctx.dataset.label}: ${ctx.parsed.y.toLocaleString('ru-RU')} ₽` }
+        }
+      },
+      scales: {
+        x:{ grid:{ color:'#1a2333' }, ticks:{ color:'#6b7a90', font:{family:"'Geologica', system-ui, sans-serif", size:12}, maxRotation:0 }, border:{ color:'#2a3a4a' } },
+        y:{ grid:{ color:'#1a2333' }, ticks:{ color:'#6b7a90', font:{family:"'Geologica', system-ui, sans-serif", size:12}, callback:v=>fmtAxis(v), maxTicksLimit:6 }, border:{ color:'#2a3a4a' } }
+      }
+    }
+  });
+}
+
+function renderTable(rows) {
+  const today = new Date().toLocaleDateString('sv-SE');
+  const filtered = [...rows].reverse();
+  document.getElementById('tbl-body').innerHTML = filtered.map(r => {
+    const drr = r.orders_sum > 0 ? (r.ads_spend / r.orders_sum * 100) : 0;
+    const isToday = r.date === today;
+    const d = new Date(r.date + 'T12:00:00');
+    const label = d.toLocaleDateString('ru-RU', {day:'2-digit', month:'short'});
+    return `<tr class="${isToday ? 'today-row' : ''}">
+      <td class="td-date">${label}${isToday ? '<span class="td-today-badge">сегодня</span>' : ''}</td>
+      <td>${fmtN(r.orders_count)}</td>
+      <td>${fmtRub(r.orders_sum)}</td>
+      <td>${fmtN(r.sales_count)}</td>
+      <td>${fmtRub(r.sales_sum)}</td>
+      <td>${fmtRub(r.ads_spend)}</td>
+      <td style="color:${drr > (plan.drr_plan||10) ? 'var(--red)' : 'var(--green)'};">${fmtPct(drr)}</td>
+    </tr>`;
+  }).join('');
+}
+
+function setView(v, el) {
+  currentView = v;
+  document.querySelectorAll('.vt').forEach(t => t.classList.remove('active'));
+  el.classList.add('active');
+  document.getElementById('chart-wrap').style.display = v === 'chart' ? 'block' : 'none';
+  document.getElementById('tbl-wrap').style.display   = v === 'table' ? 'block' : 'none';
+}
+
+async function switchMonth(month) {
+  currentMonth = month;
+  document.querySelectorAll('.month-tab').forEach(t => {
+    t.classList.toggle('active', t.dataset.month === month);
+  });
+  document.getElementById('loading').style.display = 'block';
+  document.getElementById('app').style.display = 'none';
+
+  await loadPlan(month);
+  const rows = await loadData(month);
+  window._rows = rows;
+
+  renderTempo(rows);
+  renderChart(rows.filter(r => r.date !== new Date().toLocaleDateString('sv-SE')));
+  renderTable(rows);
+
+  document.getElementById('loading').style.display = 'none';
+  document.getElementById('app').style.display = 'block';
+}
+
+// Init
+const months = getMonths();
+document.getElementById('month-tabs').innerHTML = months.map(m =>
+  `<div class="month-tab" data-month="${m}" onclick="switchMonth('${m}')">${fmtMonthLabel(m)}</div>`
+).join('');
+
+const thisMonth = new Date().toISOString().slice(0, 7);
+switchMonth(thisMonth);
+loadJournal();
+document.getElementById('journal-date').value = new Date().toLocaleDateString('sv-SE');
+
+// ─── JOURNAL ───────────────────────────────────────────────
+
+function toggleJournal() {
+  journalOpen = !journalOpen;
+  document.getElementById('journal-body').style.display = journalOpen ? 'block' : 'none';
+  document.getElementById('journal-toggle').textContent = journalOpen ? '▲' : '▼';
+}
+
+async function loadJournal() {
+  try {
+    const rows = await sbGet('/rest/v1/wb_journal?order=date.desc,created_at.desc&limit=60');
+    journalEntries = rows || [];
+    renderJournal();
+  } catch(e) { journalEntries = []; }
+}
+
+function renderJournal() {
+  const list = document.getElementById('journal-list');
+  if (!journalEntries.length) {
+    list.innerHTML = '<div class="journal-empty">Записей пока нет</div>';
+    return;
+  }
+  list.innerHTML = journalEntries.map(e => `
+    <div class="journal-entry">
+      <span class="journal-entry-date">${e.date}</span>
+      <span class="journal-entry-note">${e.note}</span>
+      <span class="journal-entry-del" onclick="deleteJournalEntry(${e.id})">×</span>
+    </div>
+  `).join('');
+}
+
+async function saveJournalEntry() {
+  const dateEl = document.getElementById('journal-date');
+  const noteEl = document.getElementById('journal-note');
+  const savedEl = document.getElementById('journal-saved');
+  const note = noteEl.value.trim();
+  if (!note) return;
+  const date = dateEl.value || new Date().toLocaleDateString('sv-SE');
+  try {
+    await sbPost('/rest/v1/wb_journal', { date, note });
+    noteEl.value = '';
+    savedEl.style.opacity = '1';
+    setTimeout(() => savedEl.style.opacity = '0', 2000);
+    await loadJournal();
+  } catch(e) { alert('Ошибка: ' + e.message); }
+}
+
+async function deleteJournalEntry(id) {
+  try {
+    await fetch(SUPABASE_URL + '/rest/v1/wb_journal?id=eq.' + id, {
+      method: 'DELETE',
+      headers: { 'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + SUPABASE_KEY }
+    });
+    await loadJournal();
+  } catch(e) {}
+}
+
+document.addEventListener('keydown', function(e) {
+  if (e.key === 'Enter' && document.activeElement && document.activeElement.id === 'journal-note') {
+    saveJournalEntry();
+  }
+});
+
+// ─── AI ANALYSIS ───────────────────────────────────────────
+
+function parseAISuggestions(text) {
+  const match = text.match(/\[ВОПРОСЫ:\s*([^\]]+)\]/);
+  if (!match) return { clean: text, suggestions: [] };
+  const suggestions = match[1].split('|').map(s => s.trim()).filter(Boolean);
+  const clean = text.replace(match[0], '').trim();
+  return { clean, suggestions };
+}
+
+function useSuggestion(btn) {
+  document.getElementById('ai-followup-input').value = btn.textContent;
+  sendFollowUp();
+}
+
+function renderChat() {
+  const body = document.getElementById('ai-body');
+  if (aiMessages.length === 0) {
+    body.className = 'ai-body empty';
+    body.textContent = 'Нажмите кнопку, чтобы получить анализ данных за последние 14 дней';
+    document.getElementById('ai-followup').style.display = 'none';
+    return;
+  }
+  body.className = 'ai-body';
+  const chatMsgs = aiMessages.filter((m, i) => m.role !== 'system' && !(i === 0 && m.role === 'user'));
+  let lastSuggestions = [];
+  const bubbles = chatMsgs.map((m, idx) => {
+    const isBot = m.role === 'assistant';
+    const isTyping = m.typing === true;
+    const isLast = idx === chatMsgs.length - 1;
+    let displayContent = m.content;
+    if (isBot && !isTyping) {
+      const parsed = parseAISuggestions(m.content);
+      displayContent = parsed.clean;
+      if (isLast) lastSuggestions = parsed.suggestions;
+    }
+    return `<div class="ai-bubble ${isBot ? 'bot' : 'user'}${isTyping ? ' typing' : ''}">
+      <div class="ai-bubble-avatar">${isBot ? '🤖' : '👤'}</div>
+      <div class="ai-bubble-text">${isBot ? displayContent : m.content.replace(/</g,'&lt;').replace(/>/g,'&gt;')}</div>
+    </div>`;
+  }).join('');
+
+  const chipsHtml = lastSuggestions.length > 0
+    ? `<div class="ai-suggestions">${lastSuggestions.map(q =>
+        `<button class="ai-suggestion-chip" onclick="useSuggestion(this)">${q}</button>`
+      ).join('')}</div>`
+    : '';
+
+  body.innerHTML = '<div class="ai-chat">' + bubbles + '</div>' + chipsHtml;
+  const hasReply = chatMsgs.some(m => m.role === 'assistant' && !m.typing);
+  document.getElementById('ai-followup').style.display = hasReply ? 'flex' : 'none';
+  body.scrollTop = body.scrollHeight;
+}
+
+async function callWebhook(messages) {
+  const WEBHOOK_URL = 'https://wbtrenz.app.n8n.cloud/webhook/wb-ai-v7';
+  const resp = await fetch(WEBHOOK_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ messages })
+  });
+  const raw = await resp.text();
+  if (!raw || !raw.trim()) throw new Error('Webhook вернул пустой ответ.');
+  let data;
+  try { data = JSON.parse(raw); } catch(e) { throw new Error('Ответ не JSON: ' + raw.slice(0, 200)); }
+  return data.result || JSON.stringify(data);
+}
+
+async function runAI() {
+  const btn = document.getElementById('ai-btn');
+  btn.disabled = true;
+  btn.textContent = '⏳ Анализирую...';
+  aiMessages = [];
+  document.getElementById('ai-followup').style.display = 'none';
+  const body = document.getElementById('ai-body');
+  body.className = 'ai-body empty';
+  body.textContent = 'Загружаю данные за 14 дней...';
+
+  const today = new Date().toLocaleDateString('sv-SE');
+  const from14 = new Date(Date.now() - 14 * 86400000).toLocaleDateString('sv-SE');
+  let ai14rows = [];
+  try {
+    const raw = await sbGet(`/rest/v1/wb_rnp?shop=eq.${SHOP}&date=gte.${from14}&date=lt.${today}&order=date.asc&limit=200`);
+    ai14rows = (raw || []).map(r => ({
+      date: r.date,
+      orders_count: r.orders_count || 0, orders_sum: r.orders_sum || 0,
+      sales_count:  r.sales_count  || 0, sales_sum:  r.sales_sum  || 0,
+      ads_spend:    r.ads_spend    || 0,
+    }));
+  } catch(e) {}
+
+  if (ai14rows.length === 0) {
+    body.textContent = 'Нет данных для анализа.';
+    btn.disabled = false;
+    btn.textContent = '✨ Запустить анализ';
+    return;
+  }
+
+  const tableText = ai14rows.map(r => {
+    const d = new Date(r.date + 'T12:00:00');
+    const day = d.toLocaleDateString('ru-RU', {weekday:'short', day:'2-digit', month:'short'});
+    const drr = r.orders_sum > 0 ? (r.ads_spend / r.orders_sum * 100).toFixed(1) : '0';
+    return `${day}: заказы ${r.orders_count}шт/${Math.round(r.orders_sum/1000)}К₽, продажи ${r.sales_count}шт/${Math.round(r.sales_sum/1000)}К₽, реклама ${Math.round(r.ads_spend/1000)}К₽, ДРР ${drr}%`;
+  }).join('\n');
+
+  const planInfo = `План на месяц: заказы ${(plan.orders_plan/1000000).toFixed(1)}М₽, продажи ${(plan.sales_plan/1000000).toFixed(1)}М₽, ДРР ${plan.drr_plan}%`;
+
+  const recentJournal = journalEntries.filter(e => e.date >= from14 && e.date <= today);
+  const journalText = recentJournal.length > 0
+    ? '\n\nДействия и события за период:\n' + recentJournal.slice().reverse().map(e => `${e.date}: ${e.note}`).join('\n')
+    : '';
+
+  let stocksText = '';
+  try {
+    const latestDateRows = await sbGet(`/rest/v1/wb_stocks?shop=eq.${SHOP}&select=date&order=date.desc&limit=1`);
+    if (latestDateRows && latestDateRows.length > 0) {
+      const lastDate = latestDateRows[0].date;
+      const stocks = await sbGet(`/rest/v1/wb_stocks?shop=eq.${SHOP}&date=eq.${lastDate}&order=article.asc&limit=500`);
+      if (stocks && stocks.length > 0) {
+        const byArticle = {};
+        for (const s of stocks) {
+          if (s.article === '__empty__') continue;
+          if (!byArticle[s.article]) byArticle[s.article] = 0;
+          byArticle[s.article] += s.quantity || 0;
+        }
+        const sorted = Object.entries(byArticle).sort((a, b) => a[1] - b[1]);
+        const zero = sorted.filter(([,q]) => q === 0);
+        const low  = sorted.filter(([,q]) => q > 0 && q <= 20);
+        const ok   = sorted.filter(([,q]) => q > 20);
+        const parts = [];
+        if (zero.length) parts.push(`Нулевые остатки (${zero.length} арт.): ${zero.map(([a]) => a).join(', ')}`);
+        if (low.length)  parts.push(`Критически мало ≤20 шт (${low.length} арт.): ${low.map(([a,q]) => a + ':' + q).join(', ')}`);
+        parts.push(`В достатке >20 шт: ${ok.length} артикулов`);
+        stocksText = '\n\nОстатки на складе (на ' + lastDate + '):\n' + parts.join('\n');
+      }
+    }
+  } catch(e) {}
+
+  const firstPrompt = `Проанализируй данные магазина Никита на Wildberries.\n\n${planInfo}\n\nДанные по дням:\n${tableText}${stocksText}${journalText}`;
+
+  aiMessages = [{ role: 'user', content: firstPrompt }];
+  try {
+    const text = await callWebhook(aiMessages);
+    aiMessages.push({ role: 'assistant', content: text });
+    renderChat();
+  } catch(e) {
+    body.className = 'ai-body empty';
+    body.textContent = 'Ошибка: ' + e.message;
+  }
+  btn.disabled = false;
+  btn.textContent = '🔄 Обновить анализ';
+}
+
+async function sendFollowUp() {
+  const input = document.getElementById('ai-followup-input');
+  const sendBtn = document.getElementById('ai-followup-btn');
+  const question = input.value.trim();
+  if (!question) return;
+  input.value = '';
+  input.disabled = true;
+  sendBtn.disabled = true;
+  aiMessages.push({ role: 'user', content: question });
+  aiMessages.push({ role: 'assistant', content: 'Думаю...', typing: true });
+  renderChat();
+  try {
+    const msgToSend = aiMessages.filter(m => !m.typing);
+    const text = await callWebhook(msgToSend);
+    aiMessages = aiMessages.filter(m => !m.typing);
+    aiMessages.push({ role: 'assistant', content: text });
+    renderChat();
+  } catch(e) {
+    aiMessages = aiMessages.filter(m => !m.typing);
+    aiMessages.push({ role: 'assistant', content: 'Ошибка: ' + e.message });
+    renderChat();
+  }
+  input.disabled = false;
+  sendBtn.disabled = false;
+  input.focus();
+}
+
+document.addEventListener('keydown', function(e) {
+  if (e.key === 'Enter' && document.activeElement && document.activeElement.id === 'ai-followup-input') {
+    sendFollowUp();
+  }
+});
+</script>
+
+    <!-- Journal -->
+    <div class="journal-wrap" style="max-width:1360px;margin:0 auto 0;padding-left:24px;padding-right:24px;box-sizing:border-box">
+      <div class="journal-header" onclick="toggleJournal()">
+        <div class="journal-title">📓 Дневник действий</div>
+        <span id="journal-toggle">▲</span>
+      </div>
+      <div id="journal-body">
+        <div class="journal-form">
+          <input type="date" id="journal-date" class="journal-date-input">
+          <input type="text" id="journal-note" class="journal-text-input" placeholder="Запись: запустили новую РК, вошли в акцию, сменили креатив...">
+          <button class="journal-save" onclick="saveJournalEntry()">Добавить</button>
+          <span class="journal-saved" id="journal-saved">✓ Сохранено</span>
+        </div>
+        <div class="journal-list" id="journal-list">
+          <div class="journal-empty">Загрузка...</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- AI Analysis -->
+    <div class="ai-wrap" style="max-width:1360px;margin:24px auto 0;padding-left:24px;padding-right:24px;box-sizing:border-box">
+      <div class="ai-header">
+        <div class="ai-title">🤖 ИИ-анализ</div>
+        <button class="ai-btn" id="ai-btn" onclick="runAI()">✨ Запустить анализ</button>
+      </div>
+      <div class="ai-body empty" id="ai-body">Нажмите кнопку, чтобы получить анализ данных за последние 14 дней</div>
+      <div class="ai-followup" id="ai-followup" style="display:none;">
+        <input type="text" id="ai-followup-input" class="ai-followup-input" placeholder="Уточнить или спросить AI...">
+        <button id="ai-followup-btn" class="ai-followup-btn" onclick="sendFollowUp()">➤</button>
+      </div>
+    </div>
+
+</body>
+</html>
