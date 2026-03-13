@@ -689,7 +689,33 @@ async function runAI() {
     }
   } catch(e) {}
 
-  const firstPrompt = `Проанализируй данные магазина Никита на Wildberries.\n\n${planInfo}\n\nДанные по дням:\n${tableText}${stocksText}${journalText}`;
+  // Считаем накопленные итоги и прогноз за текущий месяц
+  const monthStart = currentMonth + '-01';
+  let monthRows = [];
+  try {
+    monthRows = await sbGet(`/rest/v1/wb_rnp?shop=eq.${SHOP}&date=gte.${monthStart}&date=lt.${today}&order=date.asc&limit=200`) || [];
+  } catch(e) {}
+
+  const totalOrdersSum  = monthRows.reduce((s, r) => s + (r.orders_sum || 0), 0);
+  const totalSalesSum   = monthRows.reduce((s, r) => s + (r.sales_sum || 0), 0);
+  const totalAds        = monthRows.reduce((s, r) => s + (r.ads_spend || 0), 0);
+  const daysElapsed     = monthRows.length || 1;
+  const daysInMonth     = new Date(currentMonth.slice(0,4), currentMonth.slice(5,7), 0).getDate();
+  const daysLeft        = daysInMonth - daysElapsed;
+  const avgOrdersPerDay = totalOrdersSum / daysElapsed;
+  const forecastOrders  = Math.round(avgOrdersPerDay * daysInMonth);
+  const forecastPct     = plan.orders_plan > 0 ? Math.round(forecastOrders / plan.orders_plan * 100) : 0;
+  const drrFact         = totalOrdersSum > 0 ? (totalAds / totalOrdersSum * 100).toFixed(1) : '0';
+
+  const monthSummary = `Итоги с начала месяца (${daysElapsed} дн. из ${daysInMonth}):
+- Заказы факт: ${Math.round(totalOrdersSum).toLocaleString('ru-RU')} ₽ (${plan.orders_plan > 0 ? Math.round(totalOrdersSum/plan.orders_plan*100) : 0}% от плана)
+- Продажи факт: ${Math.round(totalSalesSum).toLocaleString('ru-RU')} ₽
+- Реклама факт: ${Math.round(totalAds).toLocaleString('ru-RU')} ₽, ДРР факт: ${drrFact}%
+- Средний темп: ${Math.round(avgOrdersPerDay).toLocaleString('ru-RU')} ₽/день по заказам
+- Прогноз на конец месяца при текущем темпе: ${forecastOrders.toLocaleString('ru-RU')} ₽ (${forecastPct}% от плана)
+- Осталось дней: ${daysLeft}`;
+
+  const firstPrompt = `Проанализируй данные магазина Никита на Wildberries.\n\n${planInfo}\n\n${monthSummary}\n\nДанные за последние 14 дней:\n${tableText}${stocksText}${journalText}`;
 
   aiMessages = [{ role: 'user', content: firstPrompt }];
   try {
