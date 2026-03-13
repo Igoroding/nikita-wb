@@ -590,24 +590,13 @@ function renderChat() {
 
 async function callWebhook(messages) {
   const WEBHOOK_URL = 'https://wbtrenz.app.n8n.cloud/webhook/wb-ai-v7';
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), 90000); // 90 сек таймаут
-  let resp;
-  try {
-    resp = await fetch(WEBHOOK_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ messages }),
-      signal: controller.signal
-    });
-  } catch(e) {
-    clearTimeout(timer);
-    if (e.name === 'AbortError') throw new Error('Таймаут: AI не ответил за 90 секунд. Попробуйте ещё раз.');
-    throw new Error('Сетевая ошибка: ' + e.message);
-  }
-  clearTimeout(timer);
+  const resp = await fetch(WEBHOOK_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ messages })
+  });
   const raw = await resp.text();
-  if (!raw || !raw.trim()) throw new Error('Webhook вернул пустой ответ. Проверьте что workflow WB Nikita активен в n8n.');
+  if (!raw || !raw.trim()) throw new Error('Пустой ответ от webhook.');
   let data;
   try { data = JSON.parse(raw); } catch(e) { throw new Error('Ответ не JSON: ' + raw.slice(0, 200)); }
   return data.result || JSON.stringify(data);
